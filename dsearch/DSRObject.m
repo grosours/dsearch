@@ -28,13 +28,31 @@ ENTRY(DSRTrack, @"track")
 @end
 
 @implementation DSRObject
++ (NSCache*)objectsCache
+{
+    static NSCache *cache = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        cache = [[NSCache alloc] init];
+        cache.countLimit = 10000;
+    });
+    return cache;
+}
+
 + (DSRObject*)objectFromJSON:(NSDictionary*)JSON
 {
     NSAssert([JSON objectForKey:@"id"] != nil, @"An Object should alway have an ID");
     NSAssert([JSON objectForKey:@"type"] != nil, @"An object should always have a type");
     Class c = [@{DSR_OBJECT_CLASS(DSR_OBJECT_CLASS_AS_NSDICTIONARY)} objectForKey:[JSON objectForKey:@"type"]];
     NSAssert(c != NULL, @"Unknown key");
-    return [[c alloc] initFromJSON:JSON];
+    
+    NSString *cacheKey = [NSString stringWithFormat:@"%@-%@", [JSON objectForKey:@"type"], [JSON objectForKey:@"id"]];
+    DSRObject *object = [[self objectsCache] objectForKey:cacheKey];
+    if (!object) {
+        object = [[c alloc] initFromJSON:JSON];
+        [[self objectsCache] setObject:object forKey:cacheKey];
+    }
+    return object;
 }
 
 + (NSArray *)objectsFromJSON:(NSDictionary *)JSON
