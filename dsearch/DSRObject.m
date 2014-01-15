@@ -37,6 +37,20 @@ ENTRY(DSRTrack, @"track")
     return [[c alloc] initFromJSON:JSON];
 }
 
++ (NSArray *)objectsFromJSON:(NSDictionary *)JSON
+{
+    NSArray *data = [JSON objectForKey:@"data"];
+    NSAssert(data != nil && [data isKindOfClass:[NSArray class]], @"");
+    
+    NSMutableArray *objects = [NSMutableArray array];
+    [data enumerateObjectsUsingBlock:^(NSDictionary *JSON, NSUInteger idx, BOOL *stop) {
+        DSRObject * object = (DSRAlbum*)[DSRObject objectFromJSON:JSON];
+        [objects addObject:object];
+    }];
+    
+    return [NSArray arrayWithArray:objects];
+}
+
 - (id)initFromJSON:(NSDictionary *)JSON
 {
     self = [super init];

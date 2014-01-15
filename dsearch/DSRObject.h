@@ -13,6 +13,7 @@
 @property (nonatomic, strong) NSString* identifier;
 
 + (DSRObject*)objectFromJSON:(NSDictionary*)JSON;
++ (NSArray*)objectsFromJSON:(NSDictionary*)JSON;
 
 - (id)initFromJSON:(NSDictionary*)JSON;
 - (void)getValueForKey:(NSString*)key withRequestManager:(DSRRequestManager*)manager callback:(void(^)(id value))callback;
