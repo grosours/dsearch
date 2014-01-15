@@ -160,4 +160,9 @@ ENTRY(DSRTrack, @"track")
 {
     return nil;
 }
+
+- (NSString *)debugDescription
+{
+    return [NSString stringWithFormat:@"<%@: %@>", NSStringFromClass([self class]), [self.info objectForKey:@"id"]];
+}
 @end
