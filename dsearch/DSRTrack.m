@@ -9,5 +9,25 @@
 #import "DSRTrack.h"
 
 @implementation DSRTrack
+- (NSSet *)supportedKeys
+{
+    return [[super supportedKeys]
+            setByAddingObjectsFromArray:@[@"readable", @"title", @"isrc", @"link",
+                                          @"duration", @"track_position", @"disk_number",
+                                          @"rank", @"explicit_lyrics", @"preview",
+                                          @"bpm", @"gain", @"available_countries",
+                                          @"artist", @"album"]];
+}
 
+- (NSString *)infoURL
+{
+    return [NSString stringWithFormat:@"http://api.deezer.com/track/%@", [self valueForKeyPath:@"info.id"]];
+}
+
+#pragma mark Parsing
+
+- (id)parseArtist:(NSDictionary*)JSON
+{
+    return [DSRObject objectFromJSON:JSON];
+}
 @end
