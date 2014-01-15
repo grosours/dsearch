@@ -52,6 +52,11 @@ ENTRY(DSRTrack, @"track")
     [[self supportedKeys] enumerateObjectsUsingBlock:^(NSString *key, BOOL *stop) {
         id object = [info objectForKey:key];
         if (object) {
+            NSString *selectorString = [NSString stringWithFormat:@"parse%@:", [key capitalizedString]];
+            SEL selector = NSSelectorFromString(selectorString);
+            if ([self respondsToSelector:selector]) {
+                object = [self performSelector:selector withObject:object];
+            }
             [self.info setObject:object forKey:key];
         }
     }];
@@ -81,7 +86,7 @@ ENTRY(DSRTrack, @"track")
         req.JSONCompletionBlock = ^(NSDictionary* info, NSError* error) {
             if (error == nil) {
                 [self copySupportedKeysFromInfo:info];
-                callback([info objectForKey:key]);
+                callback([self.info objectForKey:key]);
             }
             else {
                 callback(nil);
@@ -111,11 +116,11 @@ ENTRY(DSRTrack, @"track")
                 id object;
                 if ([self respondsToSelector:selector]) {
                     object = [self performSelector:selector withObject:JSON];
-                    [self.info setObject:object forKey:key];
                 }
                 else {
                     object = JSON;
                 }
+                [self.info setObject:object forKey:key];
                 callback(object);
             }
             else {
