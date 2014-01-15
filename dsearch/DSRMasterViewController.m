@@ -16,19 +16,24 @@
 #import "DSRAlbum.h"
 #import "DSRTrack.h"
 
-@interface DSRArtistCell : UITableViewCell
-+ (NSString*)reuseIdentifier;
-- (id)initWithManager:(DSRRequestManager*)manager;
-@property (nonatomic, strong) DSRArtist *artist;
-@property (nonatomic, strong) DSRRequestManager *manager;
-@end
-
 @interface DSRArtistSearchDelegate : NSObject<UISearchBarDelegate, UISearchDisplayDelegate, UITableViewDelegate, UITableViewDataSource> {
     IBOutlet UISearchDisplayController *searchDisplayController;
     IBOutlet DSRMasterViewController *mainController;
     
     NSArray *_artists;
 }
+@property (nonatomic, weak) DSRJSONRequest *searchRequest;
+@property (nonatomic, strong) NSMapTable *imageCache;
+@property (nonatomic, strong) DSRRequestManager *imageCachingManager;
+@end
+
+
+@interface DSRArtistCell : UITableViewCell
++ (NSString*)reuseIdentifier;
+- (id)initWithManager:(DSRRequestManager*)manager;
+@property (nonatomic, strong) DSRArtist *artist;
+@property (nonatomic, strong) DSRRequestManager *manager;
+@property (nonatomic, strong) DSRArtistSearchDelegate *searchDelegate;
 @end
 
 @interface DSRMasterViewController () <UITableViewDelegate, UITableViewDataSource>{
@@ -51,47 +56,129 @@
 {
     self = [super initWithStyle:UITableViewCellStyleDefault reuseIdentifier:[[self class] reuseIdentifier]];
     if (self) {
-    
         self.manager = manager;
         self.backgroundColor = [UIColor colorWithWhite:0.5 alpha:1.0];
-//        self.tintColor = [UIColor colorWithWhite:.2 alpha:1.0];
     }
     return self;
 }
 
-- (void)setArtist:(DSRArtist *)artist
-{
-    if (_artist != artist) {
-        _artist = artist;
-        [_artist getValueForKey:@"name" withRequestManager:self.manager callback:^(NSString *name) {
-            self.textLabel.text = name;
-        }];
-    }
-}
 @end
 
 
 @implementation DSRArtistSearchDelegate
+- (id)init
+{
+    self = [super init];
+    if (self) {
+        self.imageCache = [NSMapTable weakToStrongObjectsMapTable];
+    }
+    return self;
+}
+
 #pragma mark - SearchDisplayDelegate
+- (void)searchDisplayController:(UISearchDisplayController *)controller didHideSearchResultsTableView:(UITableView *)tableView {
+    [[NSNotificationCenter defaultCenter]
+     removeObserver:self name:UIKeyboardWillHideNotification object:nil];
+}
+
+- (void)searchDisplayController:(UISearchDisplayController *)controller willShowSearchResultsTableView:(UITableView *)tableView {
+    [[NSNotificationCenter defaultCenter]
+     addObserver:self selector:@selector(keyboardWillHide)
+     name:UIKeyboardWillHideNotification object:nil];
+}
+
+- (void) keyboardWillHide {
+    UITableView *tableView = searchDisplayController.searchResultsTableView;
+    [tableView setContentInset:UIEdgeInsetsZero];
+    [tableView setScrollIndicatorInsets:UIEdgeInsetsZero];
+}
 
 - (BOOL)searchDisplayController:(UISearchDisplayController *)controller shouldReloadTableForSearchString:(NSString *)searchString
 {
-    [self searchArtist:searchString];
+    if (searchString.length > 2) {
+        [self searchArtist:searchString];
+    }
+    else {
+        _artists = @[];
+        [searchDisplayController.searchResultsTableView reloadData];
+    }
     return NO;
+}
+
+- (void)setSearchRequest:(DSRJSONRequest *)searchRequest
+{
+    if (_searchRequest != searchRequest) {
+        [_searchRequest cancel];
+        _searchRequest = searchRequest;
+    }
 }
 
 - (void)searchArtist:(NSString*)artist
 {
+    // On devrait très certainement debounce la recherche pour ne pas flooder le serveur.
     NSString *URLString = [DSRDeezerSearch searchFor:DSRDeezerSearchTypeArtist withQuery:artist];
-    DSRJSONRequest *req = [[DSRJSONRequest alloc] initWithURLString:URLString];
-    req.JSONCompletionBlock = ^(NSDictionary* albums, NSError *error) {
-        _artists = [DSRObject objectsFromJSON:albums];
+    DSRJSONRequest * req = [[DSRJSONRequest alloc] initWithURLString:URLString];
+    req.JSONCompletionBlock = ^(NSDictionary* artists, NSError *error) {
+        self.searchRequest = nil;
+        _artists = [DSRObject objectsFromJSON:artists];
         [searchDisplayController.searchResultsTableView reloadData];
+        [self cacheImages];
     };
     req.priority = DSRRequestPriorityHigh;
     [mainController.manager addRequest:req];
 }
 
+- (void)setImageCachingManager:(DSRRequestManager *)imageCachingManager
+{
+    if (_imageCachingManager != imageCachingManager) {
+        [_imageCachingManager cancel];
+        _imageCachingManager = imageCachingManager;
+    }
+}
+
+- (void)cacheImages
+{
+    DSRRequestManager *manager = [mainController.manager groupingManger];
+    self.imageCachingManager = manager;
+    for (DSRArtist *artist in _artists) {
+        if ([self.imageCache objectForKey:artist] == nil) {
+            [artist
+             getValueForKey:@"picture"
+             withRequestManager:manager
+             callback:^(NSString *artistImage) {
+                 if (artistImage) {
+                     DSRImageRequest * req = [[DSRImageRequest alloc] initWithURLString:artistImage];
+                     req.priority = DSRRequestPriorityLow;
+                     req.imageCompletionBlock = ^(UIImage* image, NSError* error) {
+                         if (error == nil && image != nil) {
+                             [self.imageCache setObject:image forKey:artist];
+                         }
+                     };
+                     [manager addRequest:req];
+                 }
+             }];
+        }
+    }
+}
+
+- (void)searchBarTextDidEndEditing:(UISearchBar *)searchBar
+{
+    [self searchArtist:searchBar.text];
+}
+
+#pragma mark ScrollView
+
+- (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView
+{
+    self.imageCachingManager = nil;
+}
+
+- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView
+{
+    for (DSRArtistCell *cell in searchDisplayController.searchResultsTableView.visibleCells) {
+        cell.imageView.image =  cell.imageView.image = [self.imageCache objectForKey:cell.artist];
+    }
+}
 
 #pragma mark - Table View
 
@@ -113,7 +200,17 @@
     }
     
     DSRArtist *artist = _artists[indexPath.row];
+    cell.searchDelegate = self;
     cell.artist = artist;
+    cell.textLabel.text = [artist valueForKeyPath:@"info.name"];
+//    cell.imageView.image = [UIImage imageNamed:@"placeholder"];
+    if (tableView.isDragging || tableView.isDecelerating) {
+        cell.imageView.image = [UIImage imageNamed:@"placeholder"];
+    }
+    else {
+        cell.imageView.image = [self.imageCache objectForKey:artist];
+    }
+    
     return cell;
 }
 
