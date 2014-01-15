@@ -24,6 +24,11 @@
 		B5DE441B1885EB240026526B /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B5DE44191885EB240026526B /* InfoPlist.strings */; };
 		B5DE441D1885EB240026526B /* dsearchTests.m in Sources */ = {isa = PBXBuildFile; fileRef = B5DE441C1885EB240026526B /* dsearchTests.m */; };
 		B5DE44291885F2380026526B /* DSRRequestManager.m in Sources */ = {isa = PBXBuildFile; fileRef = B5DE44281885F2380026526B /* DSRRequestManager.m */; };
+		B5DE442D188620260026526B /* DSRDeezerSearch.m in Sources */ = {isa = PBXBuildFile; fileRef = B5DE442C188620260026526B /* DSRDeezerSearch.m */; };
+		B5DE4430188628230026526B /* DSRArtist.m in Sources */ = {isa = PBXBuildFile; fileRef = B5DE442F188628230026526B /* DSRArtist.m */; };
+		B5DE4433188628830026526B /* DSRObject.m in Sources */ = {isa = PBXBuildFile; fileRef = B5DE4432188628830026526B /* DSRObject.m */; };
+		B5DE443618862F590026526B /* DSRAlbum.m in Sources */ = {isa = PBXBuildFile; fileRef = B5DE443518862F590026526B /* DSRAlbum.m */; };
+		B5DE443918862F640026526B /* DSRTrack.m in Sources */ = {isa = PBXBuildFile; fileRef = B5DE443818862F640026526B /* DSRTrack.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -61,6 +66,16 @@
 		B5DE441C1885EB240026526B /* dsearchTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = dsearchTests.m; sourceTree = "<group>"; };
 		B5DE44271885F2380026526B /* DSRRequestManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DSRRequestManager.h; sourceTree = "<group>"; };
 		B5DE44281885F2380026526B /* DSRRequestManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DSRRequestManager.m; sourceTree = "<group>"; };
+		B5DE442B188620260026526B /* DSRDeezerSearch.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DSRDeezerSearch.h; sourceTree = "<group>"; };
+		B5DE442C188620260026526B /* DSRDeezerSearch.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DSRDeezerSearch.m; sourceTree = "<group>"; };
+		B5DE442E188628230026526B /* DSRArtist.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DSRArtist.h; sourceTree = "<group>"; };
+		B5DE442F188628230026526B /* DSRArtist.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DSRArtist.m; sourceTree = "<group>"; };
+		B5DE4431188628830026526B /* DSRObject.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DSRObject.h; sourceTree = "<group>"; };
+		B5DE4432188628830026526B /* DSRObject.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DSRObject.m; sourceTree = "<group>"; };
+		B5DE443418862F590026526B /* DSRAlbum.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DSRAlbum.h; sourceTree = "<group>"; };
+		B5DE443518862F590026526B /* DSRAlbum.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DSRAlbum.m; sourceTree = "<group>"; };
+		B5DE443718862F640026526B /* DSRTrack.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DSRTrack.h; sourceTree = "<group>"; };
+		B5DE443818862F640026526B /* DSRTrack.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DSRTrack.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -120,6 +135,7 @@
 		B5DE43F11885EB240026526B /* dsearch */ = {
 			isa = PBXGroup;
 			children = (
+				B5DE442A18861F760026526B /* Deezer */,
 				B5DE44261885F2110026526B /* Requests */,
 				B5DE43FA1885EB240026526B /* DSRAppDelegate.h */,
 				B5DE43FB1885EB240026526B /* DSRAppDelegate.m */,
@@ -289,10 +305,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B5DE442D188620260026526B /* DSRDeezerSearch.m in Sources */,
 				B5DE44291885F2380026526B /* DSRRequestManager.m in Sources */,
 				B5DE44051885EB240026526B /* DSRMasterViewController.m in Sources */,
+				B5DE443918862F640026526B /* DSRTrack.m in Sources */,
+				B5DE4430188628230026526B /* DSRArtist.m in Sources */,
 				B5DE43FC1885EB240026526B /* DSRAppDelegate.m in Sources */,
+				B5DE443618862F590026526B /* DSRAlbum.m in Sources */,
 				B5DE43F81885EB240026526B /* main.m in Sources */,
+				B5DE4433188628830026526B /* DSRObject.m in Sources */,
 				B5DE44081885EB240026526B /* DSRDetailViewController.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
