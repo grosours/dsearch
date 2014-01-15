@@ -11,26 +11,31 @@
 #pragma mark - DSRRequestOperation
 
 @interface DSRRequestOperation : NSOperation <NSURLConnectionDataDelegate, NSURLConnectionDelegate>
-@property (atomic, copy) void(^successBlock)(NSData*);
-@property (atomic, copy) void(^errorBlock)(NSError*);
 
 @property (atomic, assign) BOOL running;
 @property (atomic, assign) BOOL cancelled;
 @property (atomic, assign) BOOL finished;
 
+@property (nonatomic, strong) NSMutableSet* requests;
 @property (nonatomic, strong) NSMutableData *data;
 
 @property (nonatomic, strong) NSURLConnection *connection;
-- (id)initWithURL:(NSURL*)URL andPriority:(NSOperationQueuePriority)priority
-          success:(void(^)(NSData* data))successBlock
-            error:(void(^)(NSError* error))errorBlock;
+- (id)initWithURL:(NSURL*)URL andPriority:(NSOperationQueuePriority)priority;
+- (void)failWithError:(NSError*)error;
+- (void)succeedWithData:(NSData*)data;
+- (void)attachRequest:(DSRRequest*)request withPriority:(NSOperationQueuePriority)priority;
+- (void)detachRequest:(DSRRequest*)request;
+@end
+
+@interface DSRRequest ()
+@property (nonatomic, strong) DSRRequestOperation *operation;
+- (void)operationDidSucceed:(NSData*)data;
+- (void)operationDidFail:(NSError*)error;
 @end
 
 @implementation DSRRequestOperation
 
 - (id)initWithURL:(NSURL *)URL andPriority:(NSOperationQueuePriority)priority
-          success:(void(^)(NSData* data))successBlock
-            error:(void(^)(NSError* error))errorBlock
 {
     self = [super init];
     if (self) {
@@ -38,8 +43,7 @@
         self.running = NO;
         self.finished = NO;
         
-        self.successBlock = successBlock;
-        self.errorBlock = errorBlock;
+        self.requests = [NSMutableSet set];
         
         [self setQueuePriority:priority];
         self.connection = [[NSURLConnection alloc]
@@ -109,6 +113,55 @@
     [self didChangeValueForKey:@"isExecuting"];
 }
 
+#pragma mark Managing associated requests
+
+- (void)attachRequest:(DSRRequest *)request withPriority:(NSOperationQueuePriority)priority
+{
+    @synchronized(self.requests) {
+        [self.requests addObject:request];
+        request.operation = self;
+        if (priority > [self queuePriority]) [self setQueuePriority:priority];
+    }
+}
+
+- (void)detachRequest:(DSRRequest *)request
+{
+    @synchronized(self.requests) {
+        [self.requests removeObject:request];
+        if (self.requests.count == 0) {
+            [self cancel];
+        }
+    }
+}
+
+#pragma mark Completion handlers
+
+- (void)failWithError:(NSError *)error
+{
+    [self completeWithBlock:^(DSRRequest *request) {
+        [request operationDidFail:error];
+    }];
+}
+
+- (void)succeedWithData:(NSData *)data
+{
+    [self completeWithBlock:^(DSRRequest *request) {
+        [request operationDidSucceed:data];
+    }];
+}
+
+- (void)completeWithBlock:(void(^)(DSRRequest* request))block
+{
+    @synchronized(self.requests) {
+        [self.requests enumerateObjectsUsingBlock:^(DSRRequest *request, BOOL *stop) {
+            block(request);
+            request.operation = nil;
+        }];
+        [self.requests removeAllObjects];
+    }
+    self.requests = nil;
+}
+
 #pragma mark NSURLConnectionDelegate
 
 - (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
@@ -120,7 +173,7 @@
     [self willChangeValueForKey:@"isExecuting"];
     [self willChangeValueForKey:@"isFinished"];
     
-    self.errorBlock(error);
+    [self failWithError:error];
 }
 
 - (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response
@@ -154,17 +207,11 @@
     self.finished = YES;
     [self didChangeValueForKey:@"isFinished"];
     [self didChangeValueForKey:@"isExecuting"];
-    self.successBlock(self.data);
+    [self succeedWithData:self.data];
 }
 @end
 
 #pragma mark - DSRequest
-
-@interface DSRRequest ()
-@property (nonatomic, strong) DSRRequestOperation *operation;
-- (void)operationDidSucceed:(NSData*)data;
-- (void)operationDidFail:(NSError*)error;
-@end
 
 @implementation DSRRequest
 - (id)initWithURLString:(NSString *)urlString
@@ -176,15 +223,7 @@
 {
     self = [super init];
     if (self) {
-        self.operation = [[DSRRequestOperation alloc]
-                          initWithURL:URL
-                          andPriority:DSRRequestPriorityNormal
-                          success:^(NSData *data) {
-                              [self operationDidSucceed:data];
-                          }
-                          error:^(NSError *error) {
-                              [self operationDidFail:error];
-                          }];
+        self.URL = URL;
     }
     return self;
 }
@@ -284,8 +323,8 @@
 @interface DSRRequestGroup () {
     BOOL _canceled;
 }
-@property (nonatomic, strong) NSMutableArray *requests;
-- (void)addRequest:(DSRRequest*)request;
+@property (nonatomic, strong) NSMutableArray *cancelables;
+- (void)addCancelable:(NSObject<DSRCancelable>*)cancelable;
 @end
 
 @implementation DSRRequestGroup
@@ -294,7 +333,7 @@
     self = [super init];
     if (self) {
         _canceled = NO;
-        self.requests = [NSMutableArray array];
+        self.cancelables = [NSMutableArray array];
     }
     return self;
 }
@@ -302,19 +341,19 @@
 - (void)cancel
 {
     _canceled = YES;
-    [self.requests enumerateObjectsUsingBlock:^(DSRRequest *request, NSUInteger idx, BOOL *stop) {
+    [self.cancelables enumerateObjectsUsingBlock:^(DSRRequest *request, NSUInteger idx, BOOL *stop) {
         [request cancel];
     }];
-    self.requests = nil;
+    self.cancelables = nil;
 }
 
-- (void)addRequest:(DSRRequest *)request
+- (void)addCancelable:(NSObject<DSRCancelable> *)cancelable
 {
     if (_canceled) {
-        [request cancel];
+        [cancelable cancel];
     }
     else {
-        [self.requests addObject:request];
+        [self.cancelables addObject:cancelable];
     }
 }
 @end
@@ -322,25 +361,39 @@
 #pragma mark - DSRRequestManager
 
 @interface DSRRequestManager ()
+@property (atomic, strong) NSMapTable *operations;
 @property (atomic, strong) NSOperationQueue *queue;
 - (id)initWithQueue:(NSOperationQueue*)queue;
 @end
 
 @interface DSRGroupingRequetsManager : DSRRequestManager
 @property (nonatomic, strong) DSRRequestGroup* group;
+@property (nonatomic, strong) DSRRequestManager *parent;
 - (id)initWithParent:(DSRRequestManager*)parent;
 @end
 
 @implementation DSRGroupingRequetsManager
+
+- (DSRRequestManager *)groupingManger
+{
+    DSRGroupingRequetsManager* manager = [[DSRGroupingRequetsManager alloc] initWithParent:self.parent];
+    [manager.group addCancelable:self.group];
+    return manager;
+}
+
 - (id)initWithParent:(DSRRequestManager *)parent
 {
-    return [super initWithQueue:parent.queue];
+    self = [super initWithQueue:parent.queue];
+    if (self) {
+        self.parent = parent;
+    }
+    return self;
 }
 
 - (void)addRequest:(DSRRequest *)request
 {
     [super addRequest:request];
-    [self.group addRequest:request];
+    [self.group addCancelable:request];
 }
 
 - (void)cancel
@@ -360,9 +413,9 @@
     return shared;
 }
 
-+ (instancetype)groupingManger
+- (DSRRequestManager*)groupingManger
 {
-    return [[DSRGroupingRequetsManager alloc] initWithParent:[self sharedManager]];
+    return [[DSRGroupingRequetsManager alloc] initWithParent:self];
 }
 
 - (id)init {
@@ -371,25 +424,35 @@
     return [self initWithQueue:queue];
 }
 
+- (id)initWithQueue:(NSOperationQueue *)queue
+{
+    self = [super init];
+    if (self) {
+        self.queue = queue;
+        self.operations = [NSMapTable weakToWeakObjectsMapTable];
+    }
+    return self;
+}
+
 - (void)dealloc
 {
     [self cancel];
     self.queue = nil;
 }
 
-- (id)initWithQueue:(NSOperationQueue *)queue
-{
-    self = [super init];
-    if (self) {
-        self.queue = queue;
-    }
-    
-    return self;
-}
 
 - (void)addRequest:(DSRRequest *)request
 {
-    [self.queue addOperation:request.operation];
+    DSRRequestOperation *operation = [self.operations objectForKey:request.URL.absoluteString];
+    if (!operation) {
+        operation = [[DSRRequestOperation alloc]
+                     initWithURL:request.URL
+                     andPriority:(NSOperationQueuePriority)request.priority];
+        [self.operations setObject:operation forKey:request.URL.absoluteString];
+        [self.queue addOperation:operation];
+    }
+    [operation attachRequest:request
+                withPriority:(NSOperationQueuePriority)request.priority];
 }
 
 - (DSRRequestGroup *)groupRequests:(void (^)(DSRRequestManager *))groupTransaction
