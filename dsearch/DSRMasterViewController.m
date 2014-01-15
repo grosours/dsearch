@@ -9,6 +9,9 @@
 #import "DSRMasterViewController.h"
 
 #import "DSRDetailViewController.h"
+#import "DSRRequestManager.h"
+#import "DSRObject.h"
+#import "DSRArtist.h"
 
 @interface DSRMasterViewController () {
     NSMutableArray *_objects;
@@ -45,6 +48,17 @@
 
 - (void)insertNewObject:(id)sender
 {
+    DSRArtist *artist = (DSRArtist*)[DSRObject objectFromJSON:@{@"id": @"27", @"type": @"artist"}];
+    [artist getValueForKey:@"name" withRequestManager:[DSRRequestManager sharedManager] callback:^(NSString* name) {
+        NSLog(@"Artist name: %@", name);
+    }];
+    [artist pictureWithRequestManager:[DSRRequestManager sharedManager] callback:^(UIImage *picture) {
+        NSLog(@"Picture: %@", picture);
+    }];
+    [artist getValueForKey:@"albums" withRequestManager:[DSRRequestManager sharedManager] callback:^(id value) {
+        NSLog(@"Albums: %@", value);
+    }];
+    
     if (!_objects) {
         _objects = [[NSMutableArray alloc] init];
     }

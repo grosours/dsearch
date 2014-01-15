@@ -7,6 +7,7 @@
 //
 
 #import "DSRArtist.h"
+#import "DSRAlbum.h"
 #import "DSRRequestManager.h"
 
 @implementation DSRArtist
@@ -46,5 +47,19 @@
             callback(nil);
         }
     }];
+}
+
+- (NSArray*)parseAlbums:(NSDictionary*)JSON
+{
+    NSArray *albumsJSONs = [JSON objectForKey:@"data"];
+    NSAssert(albumsJSONs != nil && [albumsJSONs isKindOfClass:[NSArray class]], @"");
+    
+    NSMutableArray *albums = [NSMutableArray array];
+    [albumsJSONs enumerateObjectsUsingBlock:^(NSDictionary *JSON, NSUInteger idx, BOOL *stop) {
+        DSRAlbum * album = (DSRAlbum*)[DSRObject objectFromJSON:JSON];
+        [albums addObject:album];
+    }];
+    
+    return [NSArray arrayWithArray:albums];
 }
 @end

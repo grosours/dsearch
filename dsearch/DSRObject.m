@@ -91,9 +91,40 @@ ENTRY(DSRTrack, @"track")
     }
 }
 
+- (NSString*)URLForMethod:(NSString*)methodName
+{
+    return [[self infoURL] stringByAppendingPathComponent:methodName];
+}
+
 - (void)getMethodForKey:(NSString *)key withRequestManager:(DSRRequestManager *)manager callback:(void (^)(id))callback
 {
-    
+    id object = [self.info objectForKey:key];
+    if (object) {
+        callback(object);
+    }
+    else {
+        DSRJSONRequest * req = [[DSRJSONRequest alloc] initWithURLString:[self URLForMethod:key]];
+        req.JSONCompletionBlock = ^(NSDictionary* JSON, NSError* error) {
+            if (error == nil) {
+                NSString *selectorString = [NSString stringWithFormat:@"parse%@:", [key capitalizedString]];
+                SEL selector = NSSelectorFromString(selectorString);
+                id object;
+                if ([self respondsToSelector:selector]) {
+                    object = [self performSelector:selector withObject:JSON];
+                    [self.info setObject:object forKey:key];
+                }
+                else {
+                    object = JSON;
+                }
+                callback(object);
+            }
+            else {
+                callback(nil);
+            }
+        };
+        [manager addRequest:req];
+    }
+
 }
 
 - (NSSet *)supportedKeys
