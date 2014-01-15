@@ -23,6 +23,7 @@
 		B5DE44131885EB240026526B /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B5DE43EF1885EB240026526B /* UIKit.framework */; };
 		B5DE441B1885EB240026526B /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B5DE44191885EB240026526B /* InfoPlist.strings */; };
 		B5DE441D1885EB240026526B /* dsearchTests.m in Sources */ = {isa = PBXBuildFile; fileRef = B5DE441C1885EB240026526B /* dsearchTests.m */; };
+		B5DE44291885F2380026526B /* DSRRequestManager.m in Sources */ = {isa = PBXBuildFile; fileRef = B5DE44281885F2380026526B /* DSRRequestManager.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -58,6 +59,8 @@
 		B5DE44181885EB240026526B /* dsearchTests-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "dsearchTests-Info.plist"; sourceTree = "<group>"; };
 		B5DE441A1885EB240026526B /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B5DE441C1885EB240026526B /* dsearchTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = dsearchTests.m; sourceTree = "<group>"; };
+		B5DE44271885F2380026526B /* DSRRequestManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DSRRequestManager.h; sourceTree = "<group>"; };
+		B5DE44281885F2380026526B /* DSRRequestManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DSRRequestManager.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -117,6 +120,7 @@
 		B5DE43F11885EB240026526B /* dsearch */ = {
 			isa = PBXGroup;
 			children = (
+				B5DE44261885F2110026526B /* Requests */,
 				B5DE43FA1885EB240026526B /* DSRAppDelegate.h */,
 				B5DE43FB1885EB240026526B /* DSRAppDelegate.m */,
 				B5DE43FD1885EB240026526B /* Main_iPhone.storyboard */,
@@ -158,6 +162,32 @@
 				B5DE44191885EB240026526B /* InfoPlist.strings */,
 			);
 			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+		B5DE44261885F2110026526B /* Requests */ = {
+			isa = PBXGroup;
+			children = (
+				B5DE44271885F2380026526B /* DSRRequestManager.h */,
+				B5DE44281885F2380026526B /* DSRRequestManager.m */,
+			);
+			name = Requests;
+			sourceTree = "<group>";
+		};
+		B5DE442A18861F760026526B /* Deezer */ = {
+			isa = PBXGroup;
+			children = (
+				B5DE442B188620260026526B /* DSRDeezerSearch.h */,
+				B5DE442C188620260026526B /* DSRDeezerSearch.m */,
+				B5DE442E188628230026526B /* DSRArtist.h */,
+				B5DE442F188628230026526B /* DSRArtist.m */,
+				B5DE443418862F590026526B /* DSRAlbum.h */,
+				B5DE443518862F590026526B /* DSRAlbum.m */,
+				B5DE443718862F640026526B /* DSRTrack.h */,
+				B5DE443818862F640026526B /* DSRTrack.m */,
+				B5DE4431188628830026526B /* DSRObject.h */,
+				B5DE4432188628830026526B /* DSRObject.m */,
+			);
+			name = Deezer;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -259,6 +289,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B5DE44291885F2380026526B /* DSRRequestManager.m in Sources */,
 				B5DE44051885EB240026526B /* DSRMasterViewController.m in Sources */,
 				B5DE43FC1885EB240026526B /* DSRAppDelegate.m in Sources */,
 				B5DE43F81885EB240026526B /* main.m in Sources */,
