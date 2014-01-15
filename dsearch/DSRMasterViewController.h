@@ -10,7 +10,7 @@
 
 @class DSRDetailViewController;
 
-@interface DSRMasterViewController : UITableViewController
+@interface DSRMasterViewController : UIViewController
 
 @property (strong, nonatomic) DSRDetailViewController *detailViewController;
 

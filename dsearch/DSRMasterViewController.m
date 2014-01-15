@@ -9,63 +9,89 @@
 #import "DSRMasterViewController.h"
 
 #import "DSRDetailViewController.h"
+#import "DSRDeezerSearch.h"
 #import "DSRRequestManager.h"
 #import "DSRObject.h"
 #import "DSRArtist.h"
+#import "DSRAlbum.h"
+#import "DSRTrack.h"
 
-@interface DSRMasterViewController () {
-    NSMutableArray *_objects;
+@interface DSRArtistCell : UITableViewCell
++ (NSString*)reuseIdentifier;
+- (id)initWithManager:(DSRRequestManager*)manager;
+@property (nonatomic, strong) DSRArtist *artist;
+@property (nonatomic, strong) DSRRequestManager *manager;
+@end
+
+@interface DSRArtistSearchDelegate : NSObject<UISearchBarDelegate, UISearchDisplayDelegate, UITableViewDelegate, UITableViewDataSource> {
+    IBOutlet UISearchDisplayController *searchDisplayController;
+    IBOutlet DSRMasterViewController *mainController;
+    
+    NSArray *_artists;
 }
 @end
 
-@implementation DSRMasterViewController
+@interface DSRMasterViewController () <UITableViewDelegate, UITableViewDataSource>{
+    IBOutlet DSRArtistSearchDelegate *searchDelegate;
+    IBOutlet UITableView *albumTableView;
+    NSArray *_albums;
+}
+@property (nonatomic, strong) DSRRequestManager *manager;
+- (void)setAlbums:(NSArray*)albums;
+@end
 
-- (void)awakeFromNib
+
+@implementation DSRArtistCell
++ (NSString *)reuseIdentifier
 {
-    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
-        self.clearsSelectionOnViewWillAppear = NO;
-        self.preferredContentSize = CGSizeMake(320.0, 600.0);
-    }
-    [super awakeFromNib];
+    return NSStringFromClass(self);
 }
 
-- (void)viewDidLoad
+- (id)initWithManager:(DSRRequestManager *)manager
 {
-    [super viewDidLoad];
-	// Do any additional setup after loading the view, typically from a nib.
-    self.navigationItem.leftBarButtonItem = self.editButtonItem;
-
-    UIBarButtonItem *addButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(insertNewObject:)];
-    self.navigationItem.rightBarButtonItem = addButton;
-    self.detailViewController = (DSRDetailViewController *)[[self.splitViewController.viewControllers lastObject] topViewController];
-}
-
-- (void)didReceiveMemoryWarning
-{
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
-}
-
-- (void)insertNewObject:(id)sender
-{
-    DSRArtist *artist = (DSRArtist*)[DSRObject objectFromJSON:@{@"id": @"27", @"type": @"artist"}];
-    [artist getValueForKey:@"name" withRequestManager:[DSRRequestManager sharedManager] callback:^(NSString* name) {
-        NSLog(@"Artist name: %@", name);
-    }];
-    [artist pictureWithRequestManager:[DSRRequestManager sharedManager] callback:^(UIImage *picture) {
-        NSLog(@"Picture: %@", picture);
-    }];
-    [artist getValueForKey:@"albums" withRequestManager:[DSRRequestManager sharedManager] callback:^(id value) {
-        NSLog(@"Albums: %@", value);
-    }];
+    self = [super initWithStyle:UITableViewCellStyleDefault reuseIdentifier:[[self class] reuseIdentifier]];
+    if (self) {
     
-    if (!_objects) {
-        _objects = [[NSMutableArray alloc] init];
+        self.manager = manager;
+        self.backgroundColor = [UIColor colorWithWhite:0.5 alpha:1.0];
+//        self.tintColor = [UIColor colorWithWhite:.2 alpha:1.0];
     }
-    [_objects insertObject:[NSDate date] atIndex:0];
-    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:0 inSection:0];
-    [self.tableView insertRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+    return self;
 }
+
+- (void)setArtist:(DSRArtist *)artist
+{
+    if (_artist != artist) {
+        _artist = artist;
+        [_artist getValueForKey:@"name" withRequestManager:self.manager callback:^(NSString *name) {
+            self.textLabel.text = name;
+        }];
+    }
+}
+@end
+
+
+@implementation DSRArtistSearchDelegate
+#pragma mark - SearchDisplayDelegate
+
+- (BOOL)searchDisplayController:(UISearchDisplayController *)controller shouldReloadTableForSearchString:(NSString *)searchString
+{
+    [self searchArtist:searchString];
+    return NO;
+}
+
+- (void)searchArtist:(NSString*)artist
+{
+    NSString *URLString = [DSRDeezerSearch searchFor:DSRDeezerSearchTypeArtist withQuery:artist];
+    DSRJSONRequest *req = [[DSRJSONRequest alloc] initWithURLString:URLString];
+    req.JSONCompletionBlock = ^(NSDictionary* albums, NSError *error) {
+        _artists = [DSRObject objectsFromJSON:albums];
+        [searchDisplayController.searchResultsTableView reloadData];
+    };
+    req.priority = DSRRequestPriorityHigh;
+    [mainController.manager addRequest:req];
+}
+
 
 #pragma mark - Table View
 
@@ -76,65 +102,105 @@
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
-    return _objects.count;
+    return _artists.count;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Cell" forIndexPath:indexPath];
-
-    NSDate *object = _objects[indexPath.row];
-    cell.textLabel.text = [object description];
+    DSRArtistCell *cell = [tableView dequeueReusableCellWithIdentifier:[DSRArtistCell reuseIdentifier]];
+    if (!cell) {
+        cell = [[DSRArtistCell alloc] initWithManager:mainController.manager];
+    }
+    
+    DSRArtist *artist = _artists[indexPath.row];
+    cell.artist = artist;
     return cell;
 }
 
 - (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    // Return NO if you do not want the specified item to be editable.
-    return YES;
+    return NO;
 }
-
-- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath
-{
-    if (editingStyle == UITableViewCellEditingStyleDelete) {
-        [_objects removeObjectAtIndex:indexPath.row];
-        [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
-    } else if (editingStyle == UITableViewCellEditingStyleInsert) {
-        // Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view.
-    }
-}
-
-/*
-// Override to support rearranging the table view.
-- (void)tableView:(UITableView *)tableView moveRowAtIndexPath:(NSIndexPath *)fromIndexPath toIndexPath:(NSIndexPath *)toIndexPath
-{
-}
-*/
-
-/*
-// Override to support conditional rearranging of the table view.
-- (BOOL)tableView:(UITableView *)tableView canMoveRowAtIndexPath:(NSIndexPath *)indexPath
-{
-    // Return NO if you do not want the item to be re-orderable.
-    return YES;
-}
-*/
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
-        NSDate *object = _objects[indexPath.row];
-        self.detailViewController.detailItem = object;
-    }
+    DSRArtist *artist = _artists[indexPath.row];
+    [artist getValueForKey:@"albums" withRequestManager:mainController.manager callback:^(NSArray* albums) {
+        [mainController setAlbums:albums];
+    }];
+    [searchDisplayController setActive:NO animated:YES];
 }
+@end
 
-- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
+@implementation DSRMasterViewController
+
+- (void)awakeFromNib
 {
-    if ([[segue identifier] isEqualToString:@"showDetail"]) {
-        NSIndexPath *indexPath = [self.tableView indexPathForSelectedRow];
-        NSDate *object = _objects[indexPath.row];
-        [[segue destinationViewController] setDetailItem:object];
+    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
+        self.preferredContentSize = CGSizeMake(320.0, 600.0);
     }
+    [super awakeFromNib];
 }
 
+- (void)viewDidLoad
+{
+    [super viewDidLoad];
+    self.manager = [[DSRRequestManager sharedManager] groupingManger];
+}
+
+- (void)didReceiveMemoryWarning
+{
+    [super didReceiveMemoryWarning];
+}
+
+#pragma Utilities
+
+- (void)setAlbums:(NSArray *)albums
+{
+    _albums = albums;
+    [albumTableView reloadData];
+    [_albums enumerateObjectsUsingBlock:^(DSRAlbum *album, NSUInteger idx, BOOL *stop) {
+        [album getValueForKey:@"tracks" withRequestManager:self.manager callback:^(NSArray *tracks) {
+            [albumTableView reloadSections:[NSIndexSet indexSetWithIndex:idx]
+                          withRowAnimation:UITableViewRowAnimationAutomatic];
+        }];
+    }];
+}
+
+#pragma mark UITableView
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
+{
+    return _albums.count;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+{
+    return [[_albums[section] valueForKeyPath:@"info.tracks.@count"] integerValue];
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
+{
+    return [_albums[section] valueForKeyPath:@"info.title"];
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    UITableViewCell * cell = [tableView dequeueReusableCellWithIdentifier:@"cell"];
+    if (!cell) {
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"cell"];
+    }
+    cell.textLabel.text = [[[_albums[indexPath.section] valueForKeyPath:@"info.tracks"] objectAtIndex:indexPath.row]
+                           valueForKeyPath:@"info.title"];
+    return cell;
+}
+
+//- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
+//{
+//    if ([[segue identifier] isEqualToString:@"showDetail"]) {
+//        NSIndexPath *indexPath = [self.tableView indexPathForSelectedRow];
+//        NSDate *object = _objects[indexPath.row];
+//        [[segue destinationViewController] setDetailItem:object];
+//    }
+//}
 @end
