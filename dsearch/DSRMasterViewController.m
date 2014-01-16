@@ -20,6 +20,7 @@
     IBOutlet UISearchDisplayController *searchDisplayController;
     IBOutlet DSRMasterViewController *mainController;
     
+    DSRRequestManager *manager;
     NSArray *_artists;
 }
 @property (nonatomic, weak) DSRJSONRequest *searchRequest;
@@ -39,10 +40,11 @@
 @interface DSRMasterViewController () <UITableViewDelegate, UITableViewDataSource>{
     IBOutlet DSRArtistSearchDelegate *searchDelegate;
     IBOutlet UITableView *albumTableView;
+    DSRArtist *_artist;
     NSArray *_albums;
 }
 @property (nonatomic, strong) DSRRequestManager *manager;
-- (void)setAlbums:(NSArray*)albums;
+- (void)setArtist:(DSRArtist*)artist;
 @end
 
 
@@ -79,12 +81,15 @@
 - (void)searchDisplayController:(UISearchDisplayController *)controller didHideSearchResultsTableView:(UITableView *)tableView {
     [[NSNotificationCenter defaultCenter]
      removeObserver:self name:UIKeyboardWillHideNotification object:nil];
+    [manager cancel];
+    manager = nil;
 }
 
 - (void)searchDisplayController:(UISearchDisplayController *)controller willShowSearchResultsTableView:(UITableView *)tableView {
     [[NSNotificationCenter defaultCenter]
      addObserver:self selector:@selector(keyboardWillHide)
      name:UIKeyboardWillHideNotification object:nil];
+    manager = [mainController.manager groupingManger];
 }
 
 - (void) keyboardWillHide {
@@ -119,13 +124,12 @@
     NSString *URLString = [DSRDeezerSearch searchFor:DSRDeezerSearchTypeArtist withQuery:artist];
     DSRJSONRequest * req = [[DSRJSONRequest alloc] initWithURLString:URLString];
     req.JSONCompletionBlock = ^(NSDictionary* artists, NSError *error) {
-        self.searchRequest = nil;
         _artists = [DSRObject objectsFromJSON:artists];
         [searchDisplayController.searchResultsTableView reloadData];
         [self cacheImages];
     };
     req.priority = DSRRequestPriorityHigh;
-    [mainController.manager addRequest:req];
+    [manager addRequest:req];
 }
 
 - (void)setImageCachingManager:(DSRRequestManager *)imageCachingManager
@@ -138,13 +142,13 @@
 
 - (void)cacheImages
 {
-    DSRRequestManager *manager = [mainController.manager groupingManger];
-    self.imageCachingManager = manager;
+    DSRRequestManager *imageCachingManager = [manager groupingManger];
+    self.imageCachingManager = imageCachingManager;
     for (DSRArtist *artist in _artists) {
         if ([self.imageCache objectForKey:artist] == nil) {
             [artist
              getValueForKey:@"picture"
-             withRequestManager:manager
+             withRequestManager:imageCachingManager
              callback:^(NSString *artistImage) {
                  if (artistImage) {
                      DSRImageRequest * req = [[DSRImageRequest alloc] initWithURLString:artistImage];
@@ -154,7 +158,7 @@
                              [self.imageCache setObject:image forKey:artist];
                          }
                      };
-                     [manager addRequest:req];
+                     [imageCachingManager addRequest:req];
                  }
              }];
         }
@@ -176,7 +180,8 @@
 - (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView
 {
     for (DSRArtistCell *cell in searchDisplayController.searchResultsTableView.visibleCells) {
-        cell.imageView.image =  cell.imageView.image = [self.imageCache objectForKey:cell.artist];
+        UIImage *i = [self.imageCache objectForKey:cell.artist];
+        cell.imageView.image  =  i ? i : [UIImage imageNamed:@"placeholder"];
     }
 }
 
@@ -196,19 +201,20 @@
 {
     DSRArtistCell *cell = [tableView dequeueReusableCellWithIdentifier:[DSRArtistCell reuseIdentifier]];
     if (!cell) {
-        cell = [[DSRArtistCell alloc] initWithManager:mainController.manager];
+        cell = [[DSRArtistCell alloc] initWithManager:manager];
     }
     
     DSRArtist *artist = _artists[indexPath.row];
     cell.searchDelegate = self;
     cell.artist = artist;
     cell.textLabel.text = [artist valueForKeyPath:@"info.name"];
-//    cell.imageView.image = [UIImage imageNamed:@"placeholder"];
+    cell.imageView.contentMode = UIViewContentModeScaleAspectFit;
     if (tableView.isDragging || tableView.isDecelerating) {
         cell.imageView.image = [UIImage imageNamed:@"placeholder"];
     }
     else {
-        cell.imageView.image = [self.imageCache objectForKey:artist];
+        UIImage *i = [self.imageCache objectForKey:artist];
+        cell.imageView.image =  i ? i : [UIImage imageNamed:@"placeholder"];
     }
     
     return cell;
@@ -222,9 +228,7 @@
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
     DSRArtist *artist = _artists[indexPath.row];
-    [artist getValueForKey:@"albums" withRequestManager:mainController.manager callback:^(NSArray* albums) {
-        [mainController setAlbums:albums];
-    }];
+    [mainController setArtist:artist];
     [searchDisplayController setActive:NO animated:YES];
 }
 @end
@@ -252,14 +256,17 @@
 
 #pragma Utilities
 
-- (void)setAlbums:(NSArray *)albums
+- (void)setArtist:(DSRArtist *)artist
 {
-    _albums = albums;
-    [albumTableView reloadData];
-    [_albums enumerateObjectsUsingBlock:^(DSRAlbum *album, NSUInteger idx, BOOL *stop) {
-        [album getValueForKey:@"tracks" withRequestManager:self.manager callback:^(NSArray *tracks) {
-            [albumTableView reloadSections:[NSIndexSet indexSetWithIndex:idx]
-                          withRowAnimation:UITableViewRowAnimationAutomatic];
+    _artist = artist;
+    [artist getValueForKey:@"albums" withRequestManager:self.manager callback:^(NSArray* albums) {
+        _albums = albums;
+        [albumTableView reloadData];
+        [_albums enumerateObjectsUsingBlock:^(DSRAlbum *album, NSUInteger idx, BOOL *stop) {
+            [album getValueForKey:@"tracks" withRequestManager:self.manager callback:^(NSArray *tracks) {
+                [albumTableView reloadSections:[NSIndexSet indexSetWithIndex:idx]
+                              withRowAnimation:UITableViewRowAnimationAutomatic];
+            }];
         }];
     }];
 }
