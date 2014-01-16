@@ -14,6 +14,10 @@ typedef enum {
     DSRRequestPriorityHigh = 4
 } DSRRequestPriority;
 
+typedef enum {
+    DSRRequestErrorCanceled
+} DSRRequestError;
+
 @protocol DSRCancelable <NSObject>
 - (void)cancel;
 @end

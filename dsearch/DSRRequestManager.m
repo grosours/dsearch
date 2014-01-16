@@ -34,7 +34,6 @@
 @end
 
 @implementation DSRRequestOperation
-
 - (id)initWithURL:(NSURL *)URL andPriority:(NSOperationQueuePriority)priority
 {
     self = [super init];
@@ -56,18 +55,9 @@
 - (void)cancel
 {
     [self willChangeValueForKey:@"isCancelled"];
-    [self willChangeValueForKey:@"isFinished"];
-    [self willChangeValueForKey:@"isExecuting"];
     // state management
     self.cancelled = YES;
-    self.running = NO;
-    self.finished = YES;
-    
     // Cancel the NSURLConnection
-    [self.connection cancel];
-    self.connection = nil;
-    [self didChangeValueForKey:@"isExecuting"];
-    [self didChangeValueForKey:@"isFinished"];
     [self didChangeValueForKey:@"isCancelled"];
 }
 
@@ -96,21 +86,33 @@
     return self.finished;
 }
 
+- (void)done
+{
+    [self willChangeValueForKey:@"isExecuting"];
+    [self willChangeValueForKey:@"isFinished"];
+    self.running = NO;
+    self.finished = YES;
+    [self didChangeValueForKey:@"isFinished"];
+    [self didChangeValueForKey:@"isExecuting"];
+    
+    self.data = nil;
+    [self.connection cancel];
+    self.connection = nil;
+}
+
 - (void)start
 {
-    if ([self isCancelled])
-    {
-        // Must move the operation to the finished state if it is canceled.
-        [self willChangeValueForKey:@"isFinished"];
-        self.finished = YES;
-        [self didChangeValueForKey:@"isFinished"];
+    if (self.finished || [self isCancelled]) {
+        [self done];
         return;
     }
     
     [self willChangeValueForKey:@"isExecuting"];
+    self.running = YES;
+    [self didChangeValueForKey:@"isExecuting"];
+
     [self.connection scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
     [self.connection start];
-    [self didChangeValueForKey:@"isExecuting"];
 }
 
 #pragma mark Managing associated requests
@@ -134,6 +136,14 @@
     }
 }
 
+- (NSString *)debugDescription
+{
+    return [NSString stringWithFormat:@"<%@ (%d,%d,%d) %@>",
+            NSStringFromClass([self class]),
+            [self isCancelled], [self isExecuting], [self isFinished],
+            self.connection.originalRequest.URL.absoluteString];
+}
+
 #pragma mark Completion handlers
 
 - (void)failWithError:(NSError *)error
@@ -152,6 +162,7 @@
 
 - (void)completeWithBlock:(void(^)(DSRRequest* request))block
 {
+    [self done];
     @synchronized(self.requests) {
         [self.requests enumerateObjectsUsingBlock:^(DSRRequest *request, BOOL *stop) {
             block(request);
@@ -166,18 +177,16 @@
 
 - (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
 {
-    [self willChangeValueForKey:@"isExecuting"];
-    [self willChangeValueForKey:@"isFinished"];
-    self.running = NO;
-    self.finished = YES;
-    [self willChangeValueForKey:@"isExecuting"];
-    [self willChangeValueForKey:@"isFinished"];
-    
     [self failWithError:error];
 }
 
 - (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response
 {
+    if ([self isCancelled]) {
+        [self failWithError:[self cancelError]];
+        return;
+    }
+    
     NSHTTPURLResponse * r = (NSHTTPURLResponse*)response;
     if ((r.statusCode / 200) != 1) {
         [self connection:connection
@@ -186,7 +195,6 @@
                           code:r.statusCode
                           userInfo:@{NSLocalizedDescriptionKey: [NSHTTPURLResponse
                                                                  localizedStringForStatusCode:r.statusCode]}]];
-        [self cancel];
     }
     else {
         NSString *length = [[r.allHeaderFields objectsForKeys:@[@"Content-Length"] notFoundMarker:@"4096"] firstObject];
@@ -196,18 +204,24 @@
 
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
 {
+    if ([self isCancelled]) {
+        [self failWithError:[self cancelError]];
+        return;
+    }
     [self.data appendData:data];
 }
 
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection
 {
-    [self willChangeValueForKey:@"isExecuting"];
-    [self willChangeValueForKey:@"isFinished"];
-    self.running = NO;
-    self.finished = YES;
-    [self didChangeValueForKey:@"isFinished"];
-    [self didChangeValueForKey:@"isExecuting"];
     [self succeedWithData:self.data];
+}
+
+- (NSError*)cancelError
+{
+    return [NSError
+            errorWithDomain:@"DSRRequestManager"
+            code:DSRRequestErrorCanceled
+            userInfo:@{NSLocalizedDescriptionKey: NSLocalizedString(@"Operation canceled", @"")}];
 }
 @end
 
@@ -230,7 +244,7 @@
 
 - (void)cancel
 {
-    [self.operation cancel];
+    [self.operation detachRequest:self];
 }
 
 - (void)operationDidSucceed:(NSData *)data
@@ -376,8 +390,8 @@
 
 - (DSRRequestManager *)groupingManger
 {
-    DSRGroupingRequetsManager* manager = [[DSRGroupingRequetsManager alloc] initWithParent:self.parent];
-    [manager.group addCancelable:self.group];
+    DSRGroupingRequetsManager* manager = [[DSRGroupingRequetsManager alloc] initWithParent:self];
+    [self.group addCancelable:manager.group];
     return manager;
 }
 
@@ -385,6 +399,7 @@
 {
     self = [super initWithQueue:parent.queue];
     if (self) {
+        self.group = [[DSRRequestGroup alloc] init];
         self.parent = parent;
     }
     return self;
@@ -392,13 +407,16 @@
 
 - (void)addRequest:(DSRRequest *)request
 {
-    [super addRequest:request];
-    [self.group addCancelable:request];
+    if (self.group) {
+        [super addRequest:request];
+        [self.group addCancelable:request];
+    }
 }
 
 - (void)cancel
 {
     [self.group cancel];
+    self.group = nil;
 }
 @end
 
