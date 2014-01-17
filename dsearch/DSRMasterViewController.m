@@ -7,6 +7,7 @@
 //
 
 #import "DSRMasterViewController.h"
+#import <AVFoundation/AVFoundation.h>
 
 #import "DSRDetailViewController.h"
 #import "DSRDeezerSearch.h"
@@ -44,6 +45,13 @@
     NSArray *_albums;
 }
 @property (nonatomic, strong) DSRRequestManager *manager;
+@property (nonatomic, strong) AVPlayer *player;
+@property (nonatomic, strong) NSIndexPath *selectedPath;
+@property (nonatomic, strong) UIProgressView *playbackProgress;
+@property (nonatomic, strong) id timeObserver;
+@property (nonatomic, strong) UIView *accessoryView;
+@property (nonatomic, strong) UIActivityIndicatorView *throbber;
+@property (nonatomic, strong) UIButton *stopButton;
 - (void)setArtist:(DSRArtist*)artist;
 @end
 
@@ -240,6 +248,20 @@
     if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
         self.preferredContentSize = CGSizeMake(320.0, 600.0);
     }
+    self.throbber = [[UIActivityIndicatorView alloc]
+                     initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
+    [self.throbber startAnimating];
+    self.stopButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.stopButton setTitle:@"\u25A0" forState:UIControlStateNormal];
+    self.stopButton.titleLabel.font = [UIFont systemFontOfSize: 22];
+    [self.stopButton setTintColor:[UIColor blackColor]];
+    [self.stopButton sizeToFit];
+    [self.stopButton addTarget:self action:@selector(stop) forControlEvents:UIControlEventTouchUpInside];
+    self.playbackProgress = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
+    self.playbackProgress.tintColor = [UIColor colorWithWhite:.5 alpha:1];
+    [[NSNotificationCenter defaultCenter]
+     addObserver:self selector:@selector(stop)
+     name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
     [super awakeFromNib];
 }
 
@@ -293,18 +315,94 @@
     UITableViewCell * cell = [tableView dequeueReusableCellWithIdentifier:@"cell"];
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"cell"];
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
     }
-    cell.textLabel.text = [[[_albums[indexPath.section] valueForKeyPath:@"info.tracks"] objectAtIndex:indexPath.row]
-                           valueForKeyPath:@"info.title"];
+    DSRTrack * t = [self trackForIndexPath:indexPath];
+    cell.textLabel.text = [t valueForKeyPath:@"info.title"];
+    cell.detailTextLabel.text = [NSString stringWithFormat:@"%@", [t valueForKeyPath:@"info.artist.info.name"]];
+    cell.backgroundView = nil;
+    cell.accessoryView = nil;
+
+    if ([indexPath isEqual:self.selectedPath]) {
+        cell.backgroundView = self.playbackProgress;
+        cell.accessoryView = self.accessoryView;
+    }
+    
     return cell;
 }
 
-//- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
-//{
-//    if ([[segue identifier] isEqualToString:@"showDetail"]) {
-//        NSIndexPath *indexPath = [self.tableView indexPathForSelectedRow];
-//        NSDate *object = _objects[indexPath.row];
-//        [[segue destinationViewController] setDetailItem:object];
-//    }
-//}
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    self.selectedPath = indexPath;
+    self.accessoryView = self.throbber;
+    [self configureSelectedCell];
+    DSRTrack * t = [self trackForIndexPath:indexPath];
+    [t getValueForKey:@"preview" withRequestManager:self.manager callback:^(NSString* previewURLString) {
+        [self play:previewURLString];
+    }];
+}
+
+- (void)setSelectedPath:(NSIndexPath *)selectedPath
+{
+    if (_selectedPath != selectedPath) {
+        UITableViewCell * cell = [albumTableView cellForRowAtIndexPath:_selectedPath];
+        cell.backgroundView = nil;
+        cell.accessoryView = nil;
+        _selectedPath = selectedPath;
+    }
+}
+
+- (void)configureSelectedCell
+{
+    UITableViewCell* cell = [albumTableView cellForRowAtIndexPath:self.selectedPath];
+    cell.backgroundView = self.playbackProgress;
+    cell.accessoryView = self.accessoryView;
+}
+
+- (DSRTrack*)trackForIndexPath:(NSIndexPath*)indexPath
+{
+    return [[_albums[indexPath.section] valueForKeyPath:@"info.tracks"] objectAtIndex:indexPath.row];
+}
+
+- (void)play:(NSString*)URLString
+{
+    if (URLString == nil) return;
+    
+    self.player = [AVPlayer playerWithURL:[NSURL URLWithString:URLString]];
+    [self.player play];
+}
+
+- (void)stop
+{
+    [self.player pause];
+    self.player = nil;
+    UITableViewCell* cell = [albumTableView cellForRowAtIndexPath:self.selectedPath];
+    cell.backgroundView = nil;
+    cell.accessoryView = nil;
+    self.accessoryView = nil;
+    [self.playbackProgress setProgress:0.0];
+    self.selectedPath = nil;
+}
+
+- (void)setPlayer:(AVPlayer *)player
+{
+    if (_player != player) {
+        [_player removeTimeObserver:self.timeObserver];
+        _player = player;
+        if (player) {
+            _player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
+            self.accessoryView = self.stopButton;
+            UIProgressView * p = self.playbackProgress;
+            [p setProgress:0.0];
+            self.timeObserver = [_player
+                                 addPeriodicTimeObserverForInterval:CMTimeMakeWithSeconds(.01, 1000)
+                                 queue:nil
+                                 usingBlock:^(CMTime time) {
+                                     [p setProgress:(CMTimeGetSeconds(time) / 30.0) animated:YES];
+                                 }];
+        }
+        [self configureSelectedCell];
+    }
+}
+
 @end

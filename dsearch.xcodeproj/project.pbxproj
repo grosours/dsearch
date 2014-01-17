@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B5D006A118889EF900C13D95 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B5D006A018889EF900C13D95 /* AVFoundation.framework */; };
 		B5DE43EC1885EB240026526B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B5DE43EB1885EB240026526B /* Foundation.framework */; };
 		B5DE43EE1885EB240026526B /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B5DE43ED1885EB240026526B /* CoreGraphics.framework */; };
 		B5DE43F01885EB240026526B /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B5DE43EF1885EB240026526B /* UIKit.framework */; };
@@ -42,6 +43,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B5D006A018889EF900C13D95 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		B5DE43E81885EB240026526B /* dsearch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = dsearch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B5DE43EB1885EB240026526B /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		B5DE43ED1885EB240026526B /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -83,6 +85,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B5D006A118889EF900C13D95 /* AVFoundation.framework in Frameworks */,
 				B5DE43EE1885EB240026526B /* CoreGraphics.framework in Frameworks */,
 				B5DE43F01885EB240026526B /* UIKit.framework in Frameworks */,
 				B5DE43EC1885EB240026526B /* Foundation.framework in Frameworks */,
@@ -124,6 +127,7 @@
 		B5DE43EA1885EB240026526B /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				B5D006A018889EF900C13D95 /* AVFoundation.framework */,
 				B5DE43EB1885EB240026526B /* Foundation.framework */,
 				B5DE43ED1885EB240026526B /* CoreGraphics.framework */,
 				B5DE43EF1885EB240026526B /* UIKit.framework */,
@@ -454,7 +458,9 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "dsearch/dsearch-Prefix.pch";
 				INFOPLIST_FILE = "dsearch/dsearch-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = 1;
 				WRAPPER_EXTENSION = app;
 			};
 			name = Debug;
@@ -467,7 +473,9 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "dsearch/dsearch-Prefix.pch";
 				INFOPLIST_FILE = "dsearch/dsearch-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = 1;
 				WRAPPER_EXTENSION = app;
 			};
 			name = Release;
@@ -533,6 +541,7 @@
 				B5DE44221885EB240026526B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		B5DE44231885EB240026526B /* Build configuration list for PBXNativeTarget "dsearchTests" */ = {
 			isa = XCConfigurationList;
@@ -541,6 +550,7 @@
 				B5DE44251885EB240026526B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

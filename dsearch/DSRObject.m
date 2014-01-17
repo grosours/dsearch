@@ -57,6 +57,10 @@ ENTRY(DSRTrack, @"track")
 
 + (NSArray *)objectsFromJSON:(NSDictionary *)JSON
 {
+    if (JSON == nil) {
+        return nil;
+    }
+    
     NSArray *data = [JSON objectForKey:@"data"];
     NSAssert(data != nil && [data isKindOfClass:[NSArray class]], @"");
     
@@ -87,7 +91,7 @@ ENTRY(DSRTrack, @"track")
             NSString *selectorString = [NSString stringWithFormat:@"parse%@:", [key capitalizedString]];
             SEL selector = NSSelectorFromString(selectorString);
             if ([self respondsToSelector:selector]) {
-                object = [self performSelector:selector withObject:object];
+                object = ((id(*)(id, SEL, id))[self methodForSelector:selector])(self, selector, object);
             }
             [self.info setObject:object forKey:key];
         }
@@ -147,7 +151,7 @@ ENTRY(DSRTrack, @"track")
                 SEL selector = NSSelectorFromString(selectorString);
                 id object;
                 if ([self respondsToSelector:selector]) {
-                    object = [self performSelector:selector withObject:JSON];
+                    object = ((id(*)(id, SEL, id))[self methodForSelector:selector])(self, selector, JSON);
                 }
                 else {
                     object = JSON;
